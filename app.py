@@ -42,7 +42,7 @@ def scrape():
     def generate():
         for result in scrape_detik(query, hal):
             yield f"data: {json.dumps(result)}\n\n"
-        yield "data: DONE\n\n"
+        yield "data: DONE"
 
     return Response(generate(), mimetype='text/event-stream')
 
