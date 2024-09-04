@@ -153,7 +153,7 @@
           .then((blob) => {
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement("a");
-            a.style.display = "none";
+            a.style.display = "block";
             a.href = url;
             a.download = `${currentQuery}_${currentPages}_pages.csv`;
             document.body.appendChild(a);
