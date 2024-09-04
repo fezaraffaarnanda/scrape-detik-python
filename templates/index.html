@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Scrape Detik</title>
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css"
+      rel="stylesheet"
+    />
+    <style>
+      .loader {
+        border: 5px solid #f3f3f3;
+        border-top: 5px solid #3498db;
+        border-radius: 50%;
+        width: 50px;
+        height: 50px;
+        animation: spin 1s linear infinite;
+        display: none;
+      }
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
+  </head>
+  <body class="bg-gray-100 p-8">
+    <div class="max-w-4xl mx-auto bg-white p-8 rounded shadow-md">
+      <h1 class="text-3xl font-bold mb-6 text-center text-blue-600">
+        Scrape Detik.com
+      </h1>
+      <form id="scrapeForm" class="mb-8">
+        <div class="mb-4">
+          <label for="query" class="block text-gray-700 font-bold mb-2"
+            >Query:</label
+          >
+          <input
+            type="text"
+            id="query"
+            name="query"
+            required
+            class="w-full px-3 py-2 border rounded-md"
+          />
+        </div>
+        <div class="mb-4">
+          <label for="page" class="block text-gray-700 font-bold mb-2"
+            >Number of Pages:</label
+          >
+          <input
+            type="number"
+            id="page"
+            name="page"
+            min="1"
+            value="1"
+            required
+            class="w-full px-3 py-2 border rounded-md"
+          />
+        </div>
+        <button
+          type="submit"
+          class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+        >
+          Scrape
+        </button>
+      </form>
+
+      <div id="loader" class="loader mx-auto mb-4"></div>
+
+      <ul id="results" class="space-y-4"></ul>
+
+      <form id="downloadForm" class="mt-8" style="display: none">
+        <button
+          type="submit"
+          class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
+        >
+          Download CSV
+        </button>
+      </form>
+    </div>
+
+    <script>
+      const scrapeForm = document.getElementById("scrapeForm");
+      const downloadForm = document.getElementById("downloadForm");
+      const results = document.getElementById("results");
+      const loader = document.getElementById("loader");
+      let scrapedData = [];
+      let currentQuery = "";
+      let currentPages = "";
+
+      scrapeForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        results.innerHTML = "";
+        scrapedData = [];
+        loader.style.display = "block";
+        downloadForm.style.display = "none";
+
+        currentQuery = document.getElementById("query").value;
+        currentPages = document.getElementById("page").value;
+
+        const eventSource = new EventSource(
+          `/scrape?query=${encodeURIComponent(
+            currentQuery
+          )}&page=${currentPages}`
+        );
+
+        eventSource.onmessage = function (event) {
+          if (event.data === "DONE") {
+            eventSource.close();
+            loader.style.display = "none";
+            downloadForm.style.display = "block";
+          } else {
+            const data = JSON.parse(event.data);
+            scrapedData.push(data);
+            const li = document.createElement("li");
+            li.innerHTML = `
+                        <div class="border p-4 rounded-md">
+                            <h3 class="font-bold">${data[0]}</h3>
+                            <p class="text-gray-600">${data[1]}</p>
+                            <a href="${
+                              data[2]
+                            }" target="_blank" class="text-blue-500 hover:underline">Link</a>
+                            <p class="mt-2">${data[3].slice(0, 200)}...</p>
+                        </div>
+                    `;
+            results.appendChild(li);
+          }
+        };
+
+        eventSource.onerror = function (error) {
+          console.error("EventSource failed:", error);
+          eventSource.close();
+          loader.style.display = "none";
+        };
+      });
+
+      downloadForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const formData = new FormData();
+        scrapedData.forEach((data) => {
+          formData.append("results[]", data.join("|"));
+        });
+        formData.append("query", currentQuery);
+        formData.append("pages", currentPages);
+        fetch("/download", {
+          method: "POST",
+          body: formData,
+        })
+          .then((response) => response.blob())
+          .then((blob) => {
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.style.display = "none";
+            a.href = url;
+            a.download = `${currentQuery}_${currentPages}_pages.csv`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+          });
+      });
+    </script>
+  </body>
+</html>
